@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Build output
+.next/
+dist/
+dist-electron/
+build/chromium/
+
+# Caches and logs
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Runtime data & debugging
+browser-data/
+debug/
+
+# Environment variables & secrets
+.env
+.env*.local
+
+# System files
+.DS_Store
+Thumbs.db

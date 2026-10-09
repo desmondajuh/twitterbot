@@ -1,0 +1,42 @@
+{
+  "name": "x-engagement-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone cross-platform desktop X (Twitter) reply engagement assistant with Playwright, Next.js, and Electron",
+  "type": "module",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:next": "next dev",
+    "build": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\" && next build && node scripts/build-electron.js",
+    "start": "next start",
+    "cli": "tsx src/cli.ts",
+    "cli:batch": "tsx src/cli-batch.ts",
+    "test": "vitest run src",
+    "package:chromium": "node scripts/package-chromium.js",
+    "dist": "npm run build && npm run package:chromium && electron-builder",
+    "dist:win": "npm run build && npm run package:chromium && electron-builder --win",
+    "dist:mac": "npm run build && npm run package:chromium && electron-builder --mac"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "lucide-react": "^1.52.0",
+    "next": "^16.3.8",
+    "playwright": "^1.49.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20.12.0",
+    "@types/react": "19.3.0",
+    "concurrently": "^9.2.4",
+    "electron": "^36.9.5",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
