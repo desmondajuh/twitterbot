@@ -1,0 +1,84 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+jobs:
+  build-macos:
+    name: Build macOS Executable (.dmg)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Build macOS DMG
+        env:
+          # Disables certificate auto-discovery so unsigned/ad-hoc builds succeed without an Apple Developer ID
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: pnpm run dist:mac
+
+      - name: Upload macOS Artifacts (.dmg)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Executables
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows Installer (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Build Windows Installer
+        run: pnpm run dist:win
+
+      - name: Upload Windows Artifacts (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Installer
+          path: dist/*.exe
+          if-no-files-found: error

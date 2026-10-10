@@ -41,23 +41,6 @@ function findPlaywrightChromiumDir() {
   return null;
 }
 
-function copyRecursiveSync(src, dest) {
-  const exists = fs.existsSync(src);
-  const stats = exists && fs.statSync(src);
-  const isDirectory = exists && stats.isDirectory();
-
-  if (isDirectory) {
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
-    }
-    fs.readdirSync(src).forEach((childItemName) => {
-      copyRecursiveSync(path.join(src, childItemName), path.join(dest, childItemName));
-    });
-  } else {
-    fs.copyFileSync(src, dest);
-  }
-}
-
 function copyChromiumToResources() {
   ensureChromiumDownloaded();
   const sourceDir = findPlaywrightChromiumDir();
@@ -74,7 +57,7 @@ function copyChromiumToResources() {
     fs.rmSync(targetDir, { recursive: true, force: true });
   }
 
-  copyRecursiveSync(sourceDir, targetDir);
+  fs.cpSync(sourceDir, targetDir, { recursive: true });
   console.log("✅ Playwright Chromium binary successfully bundled for desktop packaging.");
 }
 
