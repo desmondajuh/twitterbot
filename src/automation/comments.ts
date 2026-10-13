@@ -8,14 +8,29 @@ import { xSelectors } from "./x-selectors";
 
 const DEFAULT_SETTINGS: Required<CommentDiscoverySettings> = {
   maxComments: 50,
-  maxScrolls: 15,
+  maxScrolls: 20,
   scrollDelayMs: 1500,
-  noNewCommentsLimit: 3,
+  noNewCommentsLimit: 6,
   excludedUsernames: [],
 };
 
 /**
-  Extracts individual comment data from a Playwright tweet article handle.
+ * Dismiss any overlays, view modals, or dialogs that might block the page timeline.
+ */
+async function dismissActiveModals(page: Page): Promise<void> {
+  try {
+    const dismissButtons = page.locator(
+      'button:has-text("Dismiss"), button:has-text("Got it"), [aria-label="Close"], button:has-text("Not now")'
+    );
+    if ((await dismissButtons.count()) > 0 && (await dismissButtons.first().isVisible())) {
+      await dismissButtons.first().click().catch(() => {});
+      await page.waitForTimeout(300);
+    }
+  } catch {}
+}
+
+/**
+ * Extracts individual comment data from a Playwright tweet container handle.
  */
 async function extractCommentDataFromArticle(
   articleLocator: ReturnType<Page["locator"]>,
@@ -32,27 +47,51 @@ async function extractCommentDataFromArticle(
     let authorDisplayName = "";
 
     if ((await userNameContainer.count()) > 0) {
+      // Method 1: Check dedicated profile links inside User-Name
+      // X links the username handle as <a href="/handle" role="link">
+      const profileLinks = await userNameContainer.locator('a[href^="/"]:not([href*="/status/"])').all();
+      for (const link of profileLinks) {
+        const href = await link.getAttribute("href");
+        if (href) {
+          const handle = href.replace(/^\//, "").split("/")[0].split("?")[0].trim();
+          if (handle && !["home", "explore", "notifications", "messages", "i"].includes(handle.toLowerCase())) {
+            authorUsername = handle;
+            const linkText = (await link.innerText()).trim();
+            if (linkText && !linkText.startsWith("@") && !authorDisplayName) {
+              authorDisplayName = linkText;
+            }
+          }
+        }
+      }
+
+      // Method 2: Extract via @handle regex match from the raw container text
       const rawUserText = await userNameContainer.innerText();
-      // X formats User-Name as: DisplayName\n@username\n·\ntime
-      const lines = rawUserText.split("\n").map((l) => l.trim()).filter(Boolean);
-      for (const line of lines) {
-        if (line.startsWith("@")) {
-          authorUsername = line.substring(1).trim();
-        } else if (!authorDisplayName && !line.includes("·") && !line.startsWith("@")) {
-          authorDisplayName = line.trim();
+      const handleMatch = rawUserText.match(/@([A-Za-z0-9_]{1,30})/);
+      if (handleMatch && handleMatch[1]) {
+        authorUsername = handleMatch[1];
+      }
+
+      // Extract display name from the first non-empty line before @handle or separator
+      if (!authorDisplayName) {
+        const lines = rawUserText.split("\n").map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          if (!line.startsWith("@") && !line.includes("·")) {
+            authorDisplayName = line.replace(/@\w+/, "").trim();
+            if (authorDisplayName) break;
+          }
         }
       }
     }
 
+    // Fallback: search profile links inside the article if not found in User-Name
     if (!authorUsername) {
-      // Fallback: try finding link containing /status/
-      const statusLink = articleLocator.locator('a[href*="/status/"]').first();
-      if ((await statusLink.count()) > 0) {
-        const href = await statusLink.getAttribute("href");
+      const authorLink = articleLocator.locator('a[href^="/"][role="link"]:not([href*="/status/"])').first();
+      if ((await authorLink.count()) > 0) {
+        const href = await authorLink.getAttribute("href");
         if (href) {
-          const match = href.match(/(?:x\.com|twitter\.com)?\/([A-Za-z0-9_]+)\/status\//i);
-          if (match && match[1]) {
-            authorUsername = match[1];
+          const handle = href.replace(/^\//, "").split("/")[0].split("?")[0].trim();
+          if (handle && !["home", "explore", "notifications", "messages", "i"].includes(handle.toLowerCase())) {
+            authorUsername = handle;
           }
         }
       }
@@ -70,33 +109,45 @@ async function extractCommentDataFromArticle(
 
     if ((await timeLocator.count()) > 0) {
       createdAt = (await timeLocator.getAttribute("datetime")) || (await timeLocator.innerText());
-      const statusLink = timeLocator.locator("xpath=ancestor::a[contains(@href, '/status/')]").first();
-      if ((await statusLink.count()) > 0) {
-        const href = await statusLink.getAttribute("href");
+      // Primary: Anchor tag wrapping or associated with the <time> element
+      const statusLinkWithTime = articleLocator.locator('a[href*="/status/"]:has(time)').first();
+      if ((await statusLinkWithTime.count()) > 0) {
+        const href = await statusLinkWithTime.getAttribute("href");
         if (href) {
-          commentUrl = href.startsWith("http")
-            ? href
-            : `https://x.com${href.startsWith("/") ? "" : "/"}${href}`;
+          commentUrl = href.startsWith("http") ? href : `https://x.com${href.startsWith("/") ? "" : "/"}${href}`;
           const match = href.match(/\/status\/(\d+)/);
           if (match && match[1]) {
             commentId = match[1];
           }
         }
+      } else {
+        // Secondary: ancestor anchor of the time element
+        const parentA = timeLocator.locator("xpath=ancestor::a[contains(@href, '/status/')]").first();
+        if ((await parentA.count()) > 0) {
+          const href = await parentA.getAttribute("href");
+          if (href) {
+            commentUrl = href.startsWith("http") ? href : `https://x.com${href.startsWith("/") ? "" : "/"}${href}`;
+            const match = href.match(/\/status\/(\d+)/);
+            if (match && match[1]) {
+              commentId = match[1];
+            }
+          }
+        }
       }
     }
 
-    // Secondary fallback for direct status link search within the article
+    // Secondary fallback: inspect all status links in this article
+    // CRITICAL: We MUST ignore any status link that points to the parentPostId!
     if (!commentId) {
-      const directLink = articleLocator.locator('a[href*="/status/"]').first();
-      if ((await directLink.count()) > 0) {
-        const href = await directLink.getAttribute("href");
+      const allStatusLinks = await articleLocator.locator('a[href*="/status/"]').all();
+      for (const link of allStatusLinks) {
+        const href = await link.getAttribute("href");
         if (href) {
-          commentUrl = href.startsWith("http")
-            ? href
-            : `https://x.com${href.startsWith("/") ? "" : "/"}${href}`;
           const match = href.match(/\/status\/(\d+)/);
-          if (match && match[1]) {
+          if (match && match[1] && match[1] !== parentPostId) {
             commentId = match[1];
+            commentUrl = href.startsWith("http") ? href : `https://x.com${href.startsWith("/") ? "" : "/"}${href}`;
+            break;
           }
         }
       }
@@ -105,7 +156,7 @@ async function extractCommentDataFromArticle(
     // Fallback commentId if direct link was not found
     if (!commentId && commentUrl) {
       const match = commentUrl.match(/\/status\/([A-Za-z0-9_-]+)/);
-      if (match) commentId = match[1];
+      if (match && match[1] !== parentPostId) commentId = match[1];
     }
 
     // If still no commentId, build stable key based on author + text hash
@@ -120,7 +171,7 @@ async function extractCommentDataFromArticle(
     }
 
     // Crucial check: Exclude the parent post itself!
-    if (commentId === parentPostId) {
+    if (commentId === parentPostId || (commentUrl && commentUrl.endsWith(`/status/${parentPostId}`))) {
       return null;
     }
 
@@ -175,8 +226,29 @@ export async function discoverComments(
   let noNewCommentsCount = 0;
   let scrollCount = 0;
 
-  // Initial wait for comments section to load
-  await page.waitForTimeout(1000);
+  const tweetSelector = '[data-testid="tweet"], [role="article"]';
+
+  // 1. Dismiss any blocking modals/popups right after navigation
+  await dismissActiveModals(page);
+
+  // 2. Initial scroll down slightly past the main post to trigger conversation loading
+  await page.evaluate(() => window.scrollBy(0, 500)).catch(() => {});
+  await page.waitForTimeout(1500);
+  await dismissActiveModals(page);
+
+  // 3. Wait for comments/conversation items to appear
+  try {
+    await page.waitForFunction(
+      (sel) => {
+        const els = document.querySelectorAll(sel);
+        return els.length >= 2 || document.querySelectorAll('[data-testid="cellInnerDiv"]').length >= 3;
+      },
+      tweetSelector,
+      { timeout: 7000 }
+    );
+  } catch {
+    log("Initial wait for comment elements timed out. Proceeding to progressive scroll discovery...", "info");
+  }
 
   while (
     commentsById.size < config.maxComments &&
@@ -185,8 +257,20 @@ export async function discoverComments(
   ) {
     const prevSize = commentsById.size;
 
-    // Locate all tweet articles currently rendered in the DOM
-    const articles = page.locator('article[data-testid="tweet"], article[role="article"]');
+    await dismissActiveModals(page);
+
+    // Expand "Show more replies" if visible in DOM
+    const showMoreBtn = page.locator(
+      'button:has-text("Show more replies"), button:has-text("Show replies"), div[role="button"]:has-text("Show replies")'
+    ).first();
+    if ((await showMoreBtn.count()) > 0 && (await showMoreBtn.isVisible())) {
+      log("Expanding additional replies thread...", "info");
+      await showMoreBtn.click().catch(() => {});
+      await page.waitForTimeout(1000);
+    }
+
+    // Locate all tweet containers currently rendered in DOM (div or article)
+    const articles = page.locator(tweetSelector);
     const articleCount = await articles.count();
 
     for (let i = 0; i < articleCount; i++) {
@@ -228,7 +312,8 @@ export async function discoverComments(
 
     // Progressive controlled scroll to trigger lazy loading of additional comments
     scrollCount++;
-    await page.evaluate(() => window.scrollBy(0, 700));
+    await page.evaluate(() => window.scrollBy(0, 800)).catch(() => {});
+    await page.keyboard.press("PageDown").catch(() => {});
     await page.waitForTimeout(config.scrollDelayMs + Math.floor(Math.random() * 500));
   }
 

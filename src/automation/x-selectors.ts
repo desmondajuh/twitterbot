@@ -17,6 +17,8 @@ export const xSelectors = {
   // Main Tweet / Post containers on status page
   post: {
     primaryTweet: '[data-testid="tweet"], article[data-testid="tweet"], [role="article"]',
+    anyTweet: '[data-testid="tweet"], [role="article"], article[data-testid="tweet"]',
+    cellInnerDiv: '[data-testid="cellInnerDiv"]',
     tweetText: '[data-testid="tweetText"]',
     notFoundNotice: '[data-testid="error-detail"]',
     rateLimitNotice: 'text="Rate limit exceeded", text="Try again later", text="Something went wrong"',

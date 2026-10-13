@@ -95,16 +95,18 @@ export async function replyToComment(
     await page.waitForTimeout(1000);
 
     let replyButtonClicked = false;
-    const cleanUsername = comment.authorUsername.toLowerCase().replace(/^@/, "");
+    const cleanUsername = comment.authorUsername.toLowerCase().replace(/^@/, "").split(/\s+/)[0];
     const textSnippet = comment.text ? comment.text.trim().substring(0, 15).toLowerCase() : "";
+
+    const tweetSelector = '[data-testid="tweet"], [role="article"]';
 
     log(`Searching for comment article by @${cleanUsername} (commentId: ${comment.id})...`, "info", jobId);
 
     // Strategy 1: Find article by direct status link containing /status/ID
     if (hasNumericStatusId) {
-      const statusLink = page.locator(`article a[href*="/status/${comment.id}"]`).first();
+      const statusLink = page.locator(`[data-testid="tweet"] a[href*="/status/${comment.id}"], article a[href*="/status/${comment.id}"], a[href*="/status/${comment.id}"]`).first();
       if ((await statusLink.count()) > 0) {
-        const matchingArticle = statusLink.locator('xpath=ancestor::article[@data-testid="tweet" or @role="article"]').first();
+        const matchingArticle = statusLink.locator('xpath=ancestor::*[@data-testid="tweet" or @role="article"]').first();
         if ((await matchingArticle.count()) > 0) {
           const replyBtn = matchingArticle.locator(xSelectors.reply.actionReplyButton).first();
           if ((await replyBtn.count()) > 0 && (await replyBtn.isVisible())) {
@@ -120,7 +122,7 @@ export async function replyToComment(
 
     // Strategy 2: Search articles in the visible thread for matching author and text
     if (!replyButtonClicked) {
-      const articles = page.locator('article[data-testid="tweet"], article[role="article"]');
+      const articles = page.locator(tweetSelector);
       const articleCount = await articles.count();
 
       for (let i = 0; i < articleCount; i++) {
@@ -160,7 +162,7 @@ export async function replyToComment(
         await page.evaluate(() => window.scrollBy(0, 600));
         await page.waitForTimeout(1000);
 
-        const articles = page.locator('article[data-testid="tweet"], article[role="article"]');
+        const articles = page.locator(tweetSelector);
         const count = await articles.count();
         for (let i = 0; i < count; i++) {
           const art = articles.nth(i);
@@ -189,7 +191,7 @@ export async function replyToComment(
 
     // Strategy 4: Primary article reply button fallback if opened on a focused comment URL page
     if (!replyButtonClicked && hasNumericStatusId) {
-      const primaryArticle = page.locator('article[data-testid="tweet"]').first();
+      const primaryArticle = page.locator(tweetSelector).first();
       if ((await primaryArticle.count()) > 0) {
         const replyBtn = primaryArticle.locator(xSelectors.reply.actionReplyButton).first();
         if ((await replyBtn.count()) > 0 && (await replyBtn.isVisible())) {

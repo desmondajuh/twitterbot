@@ -62,8 +62,49 @@ describe("Comment Discovery & Deduplication Logic", () => {
       },
     ];
 
-    const validComments = comments.filter((c) => c.id !== parentPostId);
+    const validComments = comments.filter((c) => c.id !== parentPostId && !c.url.endsWith(`/status/${parentPostId}`));
     expect(validComments.length).toBe(1);
     expect(validComments[0].id).toBe("888");
+  });
+
+  it("should correctly extract username handles without timestamp or separator contamination", () => {
+    const sampleRawUserNames = [
+      "Author Display Name\n@author_one · 10m",
+      "Crypto Enthusiast 🚀\n@crypto_guy\n·\nOct 5",
+      "@verified_user · 2h",
+      "Name With No Break @inline_handle · 1d",
+    ];
+
+    const extractedHandles = sampleRawUserNames.map((text) => {
+      const match = text.match(/@([A-Za-z0-9_]{1,30})/);
+      return match ? match[1] : null;
+    });
+
+    expect(extractedHandles).toEqual([
+      "author_one",
+      "crypto_guy",
+      "verified_user",
+      "inline_handle",
+    ]);
+  });
+
+  it("should distinguish a comment status link from a parent post reply link", () => {
+    const parentPostId = "123456789";
+    const allStatusHrefsInComment = [
+      `/parent_author/status/${parentPostId}`,
+      `/replier/status/987654321`,
+    ];
+
+    // Find the comment's own status ID by skipping parentPostId
+    let extractedCommentId = "";
+    for (const href of allStatusHrefsInComment) {
+      const match = href.match(/\/status\/(\d+)/);
+      if (match && match[1] && match[1] !== parentPostId) {
+        extractedCommentId = match[1];
+        break;
+      }
+    }
+
+    expect(extractedCommentId).toBe("987654321");
   });
 });
