@@ -13,6 +13,8 @@ export interface CommentReplyOptions {
   jobId?: string;
   skipConfirmation?: boolean;
   excludedUsernames?: string[];
+  navigationTimeoutMs?: number;
+  actionTimeoutMs?: number;
   onConfirmationRequired?: (details: {
     commentId: string;
     authorUsername: string;
@@ -71,7 +73,10 @@ export async function replyToComment(
     };
   }
 
-  const client = new XClient();
+  const client = new XClient({
+    navigationTimeoutMs: options.navigationTimeoutMs,
+    actionTimeoutMs: options.actionTimeoutMs,
+  });
 
   try {
     // 1. Navigation strategy:

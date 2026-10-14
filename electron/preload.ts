@@ -2,8 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   DiscoverCommentsOptions,
   LogMessage,
+  ConfirmationRequest,
+  ConfirmationDecision,
 } from "../src/types/electron";
-import { CreateJobInput, CommentDiscoveryResult } from "../src/types";
+import { CreateJobInput, CommentDiscoveryResult, AutomationSettings } from "../src/types";
 
 contextBridge.exposeInMainWorld("desktop", {
   isElectron: true,
@@ -38,8 +40,22 @@ contextBridge.exposeInMainWorld("desktop", {
         ipcRenderer.removeListener("automation:log", handler);
       };
     },
+    onConfirmRequest: (callback: (request: ConfirmationRequest) => void) => {
+      const handler = (_event: any, data: any) => callback(data);
+      ipcRenderer.on("automation:confirm-request", handler);
+      return () => {
+        ipcRenderer.removeListener("automation:confirm-request", handler);
+      };
+    },
+    respondConfirm: (confirmationId: string, decision: ConfirmationDecision) =>
+      ipcRenderer.invoke("automation:confirm-response", { confirmationId, decision }),
   },
   settings: {
     getPaths: () => ipcRenderer.invoke("settings:getPaths"),
+    getSettings: (): Promise<AutomationSettings> => ipcRenderer.invoke("settings:get"),
+    updateSettings: (settings: Partial<AutomationSettings>): Promise<AutomationSettings> =>
+      ipcRenderer.invoke("settings:update", settings),
+    openFolder: (target: "logs" | "screenshots" | "userData" | "browserProfile"): Promise<boolean> =>
+      ipcRenderer.invoke("settings:openFolder", target),
   },
 });

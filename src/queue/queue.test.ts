@@ -48,4 +48,16 @@ describe("Job Queue & State Management", () => {
     expect(updatedJob?.successfulItems).toBe(1);
     expect(updatedJob?.items[0].status).toBe("success");
   });
+
+  it("should delete job and update list", () => {
+    const job = jobQueue.createJob({
+      urls: ["https://x.com/user1/status/2222222222222222222"],
+      reply: "To be deleted",
+    });
+
+    expect(jobQueue.getJob(job.id)).toBeDefined();
+    const deleted = jobQueue.deleteJob(job.id);
+    expect(deleted).toBe(true);
+    expect(jobQueue.getJob(job.id)).toBeUndefined();
+  });
 });

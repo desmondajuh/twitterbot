@@ -4,6 +4,7 @@ import { captureDebugScreenshot } from "./browser";
 import { AutomationError } from "./errors";
 import { log } from "./logger";
 import { validateAndParseXPostUrl } from "../utils/url";
+import { configureReplyRecipient, canSubmitReply } from "./reply-recipients";
 
 export interface SingleReplyOptions {
   postUrl: string;
@@ -11,6 +12,8 @@ export interface SingleReplyOptions {
   jobId?: string;
   skipConfirmation?: boolean; // Safe mode vs auto batch submit
   excludedUsernames?: string[];
+  navigationTimeoutMs?: number;
+  actionTimeoutMs?: number;
   onConfirmationRequired?: (details: {
     postUrl: string;
     postId: string;
@@ -76,7 +79,10 @@ export const processSinglePostReply = async (
     };
   }
 
-  const client = new XClient();
+  const client = new XClient({
+    navigationTimeoutMs: options.navigationTimeoutMs,
+    actionTimeoutMs: options.actionTimeoutMs,
+  });
 
   try {
     // 1. Navigate to Post
@@ -85,11 +91,35 @@ export const processSinglePostReply = async (
     // 2. Check Auth
     await client.assertAuthenticated(page, jobId);
 
-    // 3. Focus composer & enter text
+    // 3. Focus composer
     await client.focusReplyComposer(page, jobId);
+
+    // 4. Configure Recipient & Enforce Safety Gate (uncheck "Others in this conversation" if in a thread)
+    const targetUsername = parsedUrl.username || "author";
+    const recipientConfig = await configureReplyRecipient(
+      page,
+      targetUsername,
+      options.excludedUsernames || [],
+      jobId
+    );
+    if (!recipientConfig.success) {
+      log(`Recipient configuration failed: ${recipientConfig.errorMessage}`, "error", jobId);
+      const screenshotPath = await captureDebugScreenshot(page, `recipient-failure-${jobId}`);
+      return {
+        success: false,
+        jobId,
+        postUrl,
+        postId: parsedUrl.postId,
+        status: "failed",
+        error: recipientConfig.error || "RECIPIENT_CONTROL_NOT_FOUND",
+        screenshotPath,
+      };
+    }
+
+    // 5. Enter reply text
     await client.enterReplyText(page, trimmedReply, jobId);
 
-    // 4. Human Confirmation (Safe Mode)
+    // 6. Human Confirmation (Safe Mode)
     if (!options.skipConfirmation && options.onConfirmationRequired) {
       log("Pausing for human confirmation before submission...", "info", jobId);
 
@@ -118,7 +148,23 @@ export const processSinglePostReply = async (
       }
     }
 
-    // 5. Submit reply
+    // 7. Verify Safety Gate
+    const canSubmit = await canSubmitReply(page, targetUsername, trimmedReply, jobId);
+    if (!canSubmit) {
+      log("Safety Gate FAIL: Post reply cannot be submitted safely", "error", jobId);
+      const screenshotPath = await captureDebugScreenshot(page, `safety-gate-failed-${jobId}`);
+      return {
+        success: false,
+        jobId,
+        postUrl,
+        postId: parsedUrl.postId,
+        status: "failed",
+        error: "TARGET_RECIPIENT_NOT_PRESENT",
+        screenshotPath,
+      };
+    }
+
+    // 8. Submit reply
     await client.submitReply(page, jobId);
 
     log(`Successfully submitted reply to post ${parsedUrl.postId}`, "info", jobId);
@@ -141,7 +187,7 @@ export const processSinglePostReply = async (
     return {
       success: false,
       jobId,
-      postUrl: parsedUrl.normalizedUrl || postUrl,
+      postUrl,
       postId: parsedUrl.postId,
       status: "failed",
       error: errorMsg,

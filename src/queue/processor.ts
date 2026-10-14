@@ -11,6 +11,8 @@ export interface ProcessorOptions {
   onConfirmationRequired?: (item: ReplyJobItem) => Promise<"submit" | "skip" | "stop">;
   keepBrowserOpenOnFinish?: boolean;
   maxRetries?: number;
+  navigationTimeoutMs?: number;
+  actionTimeoutMs?: number;
 }
 
 export class JobProcessor {
@@ -109,6 +111,8 @@ export class JobProcessor {
             jobId: `${jobId}_${i + 1}`,
             skipConfirmation: true,
             excludedUsernames: job.excludedUsernames || [],
+            navigationTimeoutMs: options.navigationTimeoutMs,
+            actionTimeoutMs: options.actionTimeoutMs,
           });
         } else {
           result = await processSinglePostReply(page, {
@@ -117,6 +121,8 @@ export class JobProcessor {
             jobId: `${jobId}_${i + 1}`,
             skipConfirmation: true,
             excludedUsernames: job.excludedUsernames || [],
+            navigationTimeoutMs: options.navigationTimeoutMs,
+            actionTimeoutMs: options.actionTimeoutMs,
           });
         }
 
@@ -143,6 +149,8 @@ export class JobProcessor {
               jobId: `${jobId}_${i + 1}_retry${attempt}`,
               skipConfirmation: true,
               excludedUsernames: job.excludedUsernames || [],
+              navigationTimeoutMs: options.navigationTimeoutMs,
+              actionTimeoutMs: options.actionTimeoutMs,
             });
           } else {
             result = await processSinglePostReply(page, {
@@ -151,6 +159,8 @@ export class JobProcessor {
               jobId: `${jobId}_${i + 1}_retry${attempt}`,
               skipConfirmation: true,
               excludedUsernames: job.excludedUsernames || [],
+              navigationTimeoutMs: options.navigationTimeoutMs,
+              actionTimeoutMs: options.actionTimeoutMs,
             });
           }
         }

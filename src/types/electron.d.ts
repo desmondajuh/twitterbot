@@ -1,4 +1,4 @@
-import { AutomationJob, CreateJobInput, CommentDiscoveryResult, XComment } from "./index";
+import { AutomationJob, CreateJobInput, CommentDiscoveryResult, XComment, AutomationSettings } from "./index";
 
 export interface BrowserStatus {
   running: boolean;
@@ -43,6 +43,19 @@ export type AutomationEventStatus =
   | "failed"
   | "stopped";
 
+export type ConfirmationDecision = "submit" | "skip" | "stop";
+
+export interface ConfirmationRequest {
+  confirmationId: string;
+  jobId: string;
+  itemId: string;
+  postUrl: string;
+  postId: string;
+  username?: string;
+  replyMessage: string;
+  comment?: XComment;
+}
+
 export interface DesktopAPI {
   isElectron: boolean;
   browser: {
@@ -60,9 +73,14 @@ export interface DesktopAPI {
     retryJob: (jobId: string) => Promise<AutomationJob | undefined>;
     onStatusChange: (callback: (status: { jobId?: string; state: AutomationEventStatus; detail?: string }) => void) => () => void;
     onLog: (callback: (logMsg: LogMessage) => void) => () => void;
+    onConfirmRequest: (callback: (request: ConfirmationRequest) => void) => () => void;
+    respondConfirm: (confirmationId: string, decision: ConfirmationDecision) => Promise<void>;
   };
   settings: {
     getPaths: () => Promise<AppPaths>;
+    getSettings: () => Promise<AutomationSettings>;
+    updateSettings: (settings: Partial<AutomationSettings>) => Promise<AutomationSettings>;
+    openFolder: (target: "logs" | "screenshots" | "userData" | "browserProfile") => Promise<boolean>;
   };
 }
 

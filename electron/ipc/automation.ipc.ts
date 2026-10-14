@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { automationService } from "../services/automation-service";
-import { DiscoverCommentsOptions } from "../../src/types/electron";
+import { DiscoverCommentsOptions, ConfirmationDecision } from "../../src/types/electron";
 import { CreateJobInput } from "../../src/types";
 
 export function registerAutomationIpc(): void {
@@ -27,4 +27,11 @@ export function registerAutomationIpc(): void {
   ipcMain.handle("automation:retryJob", async (_event: any, jobId: string) => {
     return automationService.retryJob(jobId);
   });
+
+  ipcMain.handle(
+    "automation:confirm-response",
+    async (_event: any, { confirmationId, decision }: { confirmationId: string; decision: ConfirmationDecision }) => {
+      return automationService.handleConfirmResponse(confirmationId, decision);
+    }
+  );
 }

@@ -2,6 +2,7 @@ import "./globals.css";
 import Link from "next/link";
 import { LaunchXButton } from "@/components/browser/launch-x-button";
 import { NetworkStatusBadge } from "@/components/common/network-status-badge";
+import { ConfirmationModal } from "@/components/common/confirmation-modal";
 import { ListTodo, MessageSquareText, Settings } from "lucide-react";
 
 function TwitterIcon({ className }: { className?: string }) {
@@ -77,6 +78,8 @@ export default function RootLayout({
         <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
           {children}
         </main>
+
+        <ConfirmationModal />
 
         <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
           X Engagement Assistant — Local Educational Automation Project
