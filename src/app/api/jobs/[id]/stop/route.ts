@@ -11,10 +11,9 @@ export async function POST(
 
   if (processor) {
     processor.requestStop();
-    return NextResponse.json({ message: "Stop signal sent to job processor", jobId: id });
   }
 
-  // Fallback: update job status if processor reference lost
+  // Update job status immediately in the queue
   jobQueue.updateJobStatus(id, "stopped");
-  return NextResponse.json({ message: "Job status updated to stopped", jobId: id });
+  return NextResponse.json({ message: "Job stopped successfully", jobId: id });
 }

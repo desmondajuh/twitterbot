@@ -18,13 +18,17 @@ export interface ProcessorOptions {
 export class JobProcessor {
   private isProcessing = false;
   private stopRequested = false;
+  private currentJobId: string | null = null;
 
   /**
    * Request immediate safe stop of automation queue.
    */
   requestStop(): void {
-    log("Stop signal received. Halting new job items...", "warn");
+    log("Stop signal received. Halting new job items...", "warn", this.currentJobId || undefined);
     this.stopRequested = true;
+    if (this.currentJobId) {
+      jobQueue.updateJobStatus(this.currentJobId, "stopped");
+    }
   }
 
   isStopped(): boolean {
@@ -46,6 +50,7 @@ export class JobProcessor {
 
     this.isProcessing = true;
     this.stopRequested = false;
+    this.currentJobId = jobId;
     jobQueue.updateJobStatus(jobId, "running");
     log(`Started execution of job ${jobId} with ${job.totalItems} items. Mode: ${job.confirmationMode}`, "info", jobId);
 
@@ -197,6 +202,7 @@ export class JobProcessor {
       throw err;
     } finally {
       this.isProcessing = false;
+      this.currentJobId = null;
       if (!options.keepBrowserOpenOnFinish) {
         await closeBrowserContext();
       }

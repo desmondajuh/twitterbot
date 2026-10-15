@@ -172,8 +172,11 @@ export class AutomationService {
     const processor = this.activeProcessors.get(jobId);
     if (processor) {
       processor.requestStop();
-      this.broadcastStatus(jobId, "stopped", "Stop requested by user.");
     }
+    // Immediately persist stopped status in the job queue
+    jobQueue.updateJobStatus(jobId, "stopped");
+    this.broadcastStatus(jobId, "stopped", "Stop requested by user.");
+
     // Release any pending confirmations for this job
     for (const [id, pending] of this.pendingConfirmations.entries()) {
       if (pending.jobId === jobId) {

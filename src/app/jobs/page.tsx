@@ -12,12 +12,19 @@ function JobsDashboardContent() {
   const activeJobId = searchParams.get("id");
 
   const [jobs, setJobs] = useState<AutomationJob[]>([]);
-  const [selectedJob, setSelectedJob] = useState<AutomationJob | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(activeJobId || null);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
-  const fetchJobs = async () => {
-    setIsRefreshing(true);
+  // Derive selectedJob directly from jobs list and selectedJobId
+  const selectedJob =
+    jobs.find((j) => j.id === selectedJobId) ||
+    (selectedJobId ? null : jobs.length > 0 ? jobs[0] : null);
+
+  const fetchJobs = async (isManual = false) => {
+    if (isManual) {
+      setIsManualRefreshing(true);
+    }
     try {
       let jobList: AutomationJob[] = [];
       if (typeof window !== "undefined" && window.desktop?.automation?.getAllJobs) {
@@ -29,67 +36,85 @@ function JobsDashboardContent() {
       }
 
       setJobs(jobList);
-      if (activeJobId) {
-        const match = jobList.find((j: AutomationJob) => j.id === activeJobId);
-        if (match) setSelectedJob(match);
-      } else if (selectedJob) {
-        // Keep currently selected job synchronized with fresh counts and status
-        const match = jobList.find((j: AutomationJob) => j.id === selectedJob.id);
-        if (match) setSelectedJob(match);
-        else if (jobList.length > 0) setSelectedJob(jobList[0]);
-        else setSelectedJob(null);
-      } else if (jobList.length > 0) {
-        setSelectedJob(jobList[0]);
-      }
+      setSelectedJobId((currentId) => {
+        // If a job is already selected and still exists in jobList, keep it
+        if (currentId && jobList.some((j: AutomationJob) => j.id === currentId)) {
+          return currentId;
+        }
+        // Otherwise fallback to activeJobId from URL if valid
+        if (activeJobId && jobList.some((j: AutomationJob) => j.id === activeJobId)) {
+          return activeJobId;
+        }
+        // Otherwise default to first available job
+        return jobList.length > 0 ? jobList[0].id : null;
+      });
     } catch (err) {
       console.error("Failed to fetch jobs", err);
     } finally {
       setLoading(false);
-      setTimeout(() => setIsRefreshing(false), 300);
+      if (isManual) {
+        setTimeout(() => setIsManualRefreshing(false), 300);
+      }
     }
   };
 
   useEffect(() => {
-    fetchJobs();
+    fetchJobs(false);
 
     // Subscribe to IPC status updates if running in Electron
     let unsubscribe: (() => void) | undefined;
     if (typeof window !== "undefined" && window.desktop?.automation?.onStatusChange) {
       unsubscribe = window.desktop.automation.onStatusChange(() => {
-        fetchJobs();
+        fetchJobs(false);
       });
     }
 
-    const interval = setInterval(fetchJobs, 2000);
+    // Background polling runs silently every 3s without animating the manual refresh button
+    const interval = setInterval(() => {
+      fetchJobs(false);
+    }, 3000);
+
     return () => {
       clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
-  }, [activeJobId]);
+  }, []);
 
   const handleStopJob = async (jobId: string) => {
+    // Optimistic UI update immediately
+    setJobs((prevJobs) =>
+      prevJobs.map((j) => (j.id === jobId ? { ...j, status: "stopped" } : j))
+    );
+
     try {
       if (typeof window !== "undefined" && window.desktop?.automation?.stopJob) {
         await window.desktop.automation.stopJob(jobId);
       } else {
         await fetch(`/api/jobs/${jobId}/stop`, { method: "POST" });
       }
-      fetchJobs();
+      await fetchJobs(false);
     } catch (err) {
       console.error("Failed to stop job", err);
+      await fetchJobs(false);
     }
   };
 
   const handleRetryJob = async (jobId: string) => {
+    // Optimistic UI update immediately
+    setJobs((prevJobs) =>
+      prevJobs.map((j) => (j.id === jobId ? { ...j, status: "running" } : j))
+    );
+
     try {
       if (typeof window !== "undefined" && window.desktop?.automation?.retryJob) {
         await window.desktop.automation.retryJob(jobId);
       } else {
         await fetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
       }
-      fetchJobs();
+      await fetchJobs(false);
     } catch (err) {
       console.error("Failed to retry job", err);
+      await fetchJobs(false);
     }
   };
 
@@ -102,8 +127,8 @@ function JobsDashboardContent() {
       }
       const updatedList = jobs.filter((j) => j.id !== jobId);
       setJobs(updatedList);
-      if (selectedJob?.id === jobId) {
-        setSelectedJob(updatedList.length > 0 ? updatedList[0] : null);
+      if (selectedJobId === jobId) {
+        setSelectedJobId(updatedList.length > 0 ? updatedList[0].id : null);
       }
     } catch (err) {
       console.error("Failed to delete job", err);
@@ -128,12 +153,12 @@ function JobsDashboardContent() {
           </p>
         </div>
         <button
-          onClick={fetchJobs}
-          disabled={isRefreshing}
+          onClick={() => fetchJobs(true)}
+          disabled={isManualRefreshing}
           className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/60 transition-all cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-sky-400" : ""}`} />
-          <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isManualRefreshing ? "animate-spin text-sky-400" : ""}`} />
+          <span>{isManualRefreshing ? "Refreshing..." : "Refresh"}</span>
         </button>
       </div>
 
@@ -158,7 +183,14 @@ function JobsDashboardContent() {
                 return (
                   <button
                     key={job.id}
-                    onClick={() => setSelectedJob(job)}
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      if (typeof window !== "undefined") {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set("id", job.id);
+                        window.history.replaceState({}, "", url.toString());
+                      }
+                    }}
                     className={`w-full p-4 rounded-xl text-left border transition-all ${
                       isSelected
                         ? "bg-slate-800 border-sky-500/80 shadow-lg shadow-sky-500/10"
