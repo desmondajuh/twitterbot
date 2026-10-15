@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld("desktop", {
     getJob: (jobId: string) => ipcRenderer.invoke("automation:getJob", jobId),
     getAllJobs: () => ipcRenderer.invoke("automation:getAllJobs"),
     retryJob: (jobId: string) => ipcRenderer.invoke("automation:retryJob", jobId),
+    deleteJob: (jobId: string) => ipcRenderer.invoke("automation:deleteJob", jobId),
     onStatusChange: (
       callback: (status: { jobId?: string; state: string; detail?: string }) => void
     ) => {

@@ -28,6 +28,10 @@ export function registerAutomationIpc(): void {
     return automationService.retryJob(jobId);
   });
 
+  ipcMain.handle("automation:deleteJob", async (_event: any, jobId: string) => {
+    return automationService.deleteJob(jobId);
+  });
+
   ipcMain.handle(
     "automation:confirm-response",
     async (_event: any, { confirmationId, decision }: { confirmationId: string; decision: ConfirmationDecision }) => {

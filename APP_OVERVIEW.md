@@ -74,8 +74,9 @@ Designed for finding engaged users under any high-traffic or niche tweet:
 3. **Automated Discovery Engine**:
    - Opens the persistent Chromium browser to the target post.
    - Automatically dismisses popups, overlays, and "Views" modals.
-   - Scrolls down progressively up to `maxScrolls` (default: 20) with delays to trigger lazy-loaded comments.
-   - Stops early if no new comments appear after consecutive scrolls (`noNewCommentsLimit: 6`).
+   - Dynamic Discovery Limit: Configurable limit up to 500 comments (default: 300) with an inline UI limit control.
+   - Scrolls down progressively up to `maxScrolls` (dynamically calculated up to 200 scrolls; default: 120) with delays to trigger lazy-loaded comments.
+   - Stops early if no new comments appear after consecutive scrolls (`noNewCommentsLimit: 8`).
    - Extracts comment text, author handle, author display name, timestamp, and status URL.
    - Ignores status links that point back to the parent post.
 4. **Interactive Comment Selection UI**:
@@ -86,9 +87,11 @@ Designed for finding engaged users under any high-traffic or niche tweet:
 5. **Reply Composer & Character Counter**:
    - Character count indicator (max 280 characters) with warning colors (>240 amber, >280 red).
 6. **Confirmation Mode Toggle**:
-   - **Safe Mode (Per-Comment)**: Prompt before submitting each reply.
-   - **Batch Mode**: Single confirmation before executing the entire queue.
-7. **Preview Modal**:
+   - **Batch Mode (Default)**: Single approval before launching execution; runs sequentially through the queue with real-time item status and progress tracking.
+   - **Safe Mode (Per-Comment / Per-Post)**: Pauses before submitting each reply to require manual user confirmation.
+7. **High-Volume Job Capacity**:
+   - Supports batch reply jobs up to 500 items (default: 300 items) per execution queue.
+8. **Preview Modal**:
    - Visual review card showing the target comments, authors, and preview of reply before starting the job.
 
 ### 3.2. Workflow 2: Direct Post Reply Mode
@@ -218,8 +221,15 @@ twitterbot/
 │   │   ├── comments/comment-card.tsx # Interactive card displaying discovered comments
 │   │   └── common/network-status-badge.tsx # Real-time online/offline connection badge
 │   │
+│   ├── db/                           # Embedded SQLite Database Layer
+│   │   ├── index.ts                  # DatabaseSync connection, WAL mode, legacy JSON auto-migration
+│   │   ├── schema.ts                 # SQL DDL schemas for jobs, job_items, and settings tables & indexes
+│   │   ├── jobs-repository.ts        # Typed repository for jobs, items, status mutators & cascading deletes
+│   │   ├── settings-repository.ts    # Typed repository for system configuration parameters
+│   │   └── sqlite.ts                 # Universal node:sqlite runtime loader (compatible with ESM & CommonJS)
+│   │
 │   ├── queue/                        # Sequential Job Queue Subsystem
-│   │   ├── queue.ts                  # JobQueueManager (in-memory job store & state mutators)
+│   │   ├── queue.ts                  # JobQueueManager (backed by SQLite JobsRepository)
 │   │   └── processor.ts              # Sequential JobProcessor with retry loops & jitter delays
 │   │
 │   ├── types/                        # TypeScript Interface Definitions

@@ -7,10 +7,10 @@ import { log } from "./logger";
 import { xSelectors } from "./x-selectors";
 
 const DEFAULT_SETTINGS: Required<CommentDiscoverySettings> = {
-  maxComments: 50,
-  maxScrolls: 20,
+  maxComments: 300,
+  maxScrolls: 120,
   scrollDelayMs: 1500,
-  noNewCommentsLimit: 6,
+  noNewCommentsLimit: 8,
   excludedUsernames: [],
 };
 

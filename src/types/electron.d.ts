@@ -71,6 +71,7 @@ export interface DesktopAPI {
     getJob: (jobId: string) => Promise<AutomationJob | undefined>;
     getAllJobs: () => Promise<AutomationJob[]>;
     retryJob: (jobId: string) => Promise<AutomationJob | undefined>;
+    deleteJob: (jobId: string) => Promise<boolean>;
     onStatusChange: (callback: (status: { jobId?: string; state: AutomationEventStatus; detail?: string }) => void) => () => void;
     onLog: (callback: (logMsg: LogMessage) => void) => () => void;
     onConfirmRequest: (callback: (request: ConfirmationRequest) => void) => () => void;

@@ -30,13 +30,14 @@ export default function NewJobPage() {
   // Post Reply Form State
   const [rawUrls, setRawUrls] = useState("");
   const [replyText, setReplyText] = useState("");
-  const [confirmationMode, setConfirmationMode] = useState<ConfirmationMode>("per-post");
+  const [confirmationMode, setConfirmationMode] = useState<ConfirmationMode>("batch");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Comment Discovery State (Phase 1, 2, 3, 4, 5)
   const [commentPostUrl, setCommentPostUrl] = useState("");
+  const [discoveryLimit, setDiscoveryLimit] = useState(300);
   const [commentReplyText, setCommentReplyText] = useState("");
   const [excludedUsernamesInput, setExcludedUsernamesInput] = useState("");
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -89,11 +90,14 @@ export default function NewJobPage() {
     setParentPostId(null);
 
     try {
+      const maxToDiscover = Math.min(500, Math.max(1, discoveryLimit || 300));
+      const calculatedScrolls = Math.min(200, Math.max(20, Math.ceil(maxToDiscover / 2)));
       let data;
       if (typeof window !== "undefined" && window.desktop?.automation?.discoverComments) {
         data = await window.desktop.automation.discoverComments({
           postUrl: parsed.normalizedUrl,
-          maxComments: 50,
+          maxComments: maxToDiscover,
+          maxScrolls: calculatedScrolls,
           excludedUsernames: parsedExcludedUsernames,
         });
       } else {
@@ -102,7 +106,8 @@ export default function NewJobPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             postUrl: parsed.normalizedUrl,
-            maxComments: 50,
+            maxComments: maxToDiscover,
+            maxScrolls: calculatedScrolls,
             excludedUsernames: parsedExcludedUsernames,
           }),
         });
@@ -166,10 +171,12 @@ export default function NewJobPage() {
 
       if (typeof window !== "undefined" && window.desktop?.automation?.createReplyJob) {
         const res = await window.desktop.automation.createReplyJob({
-          urls: [parsed.normalizedUrl || commentPostUrl],
+          urls: selectedComments.map((c) =>
+            c.url.startsWith("http") ? c.url : `https://x.com${c.url.startsWith("/") ? "" : "/"}${c.url}`
+          ),
           comments: selectedComments,
           reply: commentReplyText.trim(),
-          confirmationMode: confirmationMode === "batch" ? "batch" : "per-post",
+          confirmationMode: confirmationMode === "per-post" ? "per-post" : "batch",
           type: "comment_reply",
           excludedUsernames: parsedExcludedUsernames,
         });
@@ -182,7 +189,7 @@ export default function NewJobPage() {
             postUrl: parsed.normalizedUrl || commentPostUrl,
             comments: selectedComments,
             reply: commentReplyText.trim(),
-            confirmationMode: confirmationMode === "batch" ? "batch" : "per-comment",
+            confirmationMode: confirmationMode === "per-post" ? "per-comment" : "batch",
             excludedUsernames: parsedExcludedUsernames,
           }),
         });
@@ -317,6 +324,21 @@ export default function NewJobPage() {
                     placeholder="https://x.com/username/status/123456789"
                     className="flex-1 bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 font-mono"
                   />
+                  <div className="relative shrink-0">
+                    <input
+                      type="number"
+                      min={10}
+                      max={500}
+                      step={10}
+                      value={discoveryLimit}
+                      onChange={(e) => setDiscoveryLimit(Math.min(500, Math.max(1, parseInt(e.target.value) || 300)))}
+                      title="Max comments to discover (up to 500, default: 300)"
+                      className="w-24 bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-3 text-sm text-center text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/50 font-mono"
+                    />
+                    <span className="absolute -top-2 left-2 bg-slate-800 text-[9px] uppercase font-bold px-1 rounded text-slate-400">
+                      Limit
+                    </span>
+                  </div>
                   <button
                     type="button"
                     disabled={isDiscovering || !commentPostUrl.trim()}
@@ -517,6 +539,7 @@ export default function NewJobPage() {
                       >
                         <div className="flex items-center justify-between w-full mb-1">
                           <Zap className="w-4 h-4 text-indigo-400" />
+                          <span className="text-[10px] uppercase font-bold text-indigo-400">Default</span>
                         </div>
                         <div className="font-semibold text-xs text-white">Batch Mode</div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
@@ -698,7 +721,6 @@ export default function NewJobPage() {
                   >
                     <div className="flex items-center justify-between w-full mb-2">
                       <ShieldAlert className="w-5 h-5 text-sky-400" />
-                      <span className="text-xs uppercase tracking-wider font-bold text-sky-400">Default</span>
                     </div>
                     <div className="font-semibold text-sm text-white">Safe Mode (Per-Post)</div>
                     <div className="text-xs text-slate-400 mt-1">
@@ -717,6 +739,7 @@ export default function NewJobPage() {
                   >
                     <div className="flex items-center justify-between w-full mb-2">
                       <Zap className="w-5 h-5 text-indigo-400" />
+                      <span className="text-xs uppercase tracking-wider font-bold text-indigo-400">Default</span>
                     </div>
                     <div className="font-semibold text-sm text-white">Batch Mode</div>
                     <div className="text-xs text-slate-400 mt-1">

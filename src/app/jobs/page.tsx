@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AutomationJob, ReplyJobItem } from "../../types";
-import { CheckCircle2, XCircle, MinusCircle, AlertTriangle, Square, Play, RefreshCw, Clock, RotateCcw } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, AlertTriangle, Square, Play, RefreshCw, Clock, RotateCcw, Trash2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +14,16 @@ function JobsDashboardContent() {
   const [jobs, setJobs] = useState<AutomationJob[]>([]);
   const [selectedJob, setSelectedJob] = useState<AutomationJob | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchJobs = async () => {
+    setIsRefreshing(true);
     try {
       let jobList: AutomationJob[] = [];
       if (typeof window !== "undefined" && window.desktop?.automation?.getAllJobs) {
         jobList = await window.desktop.automation.getAllJobs();
       } else {
-        const res = await fetch("/api/jobs");
+        const res = await fetch("/api/jobs", { cache: "no-store" });
         const data = await res.json();
         jobList = data.jobs || [];
       }
@@ -30,13 +32,20 @@ function JobsDashboardContent() {
       if (activeJobId) {
         const match = jobList.find((j: AutomationJob) => j.id === activeJobId);
         if (match) setSelectedJob(match);
-      } else if (jobList.length > 0 && !selectedJob) {
+      } else if (selectedJob) {
+        // Keep currently selected job synchronized with fresh counts and status
+        const match = jobList.find((j: AutomationJob) => j.id === selectedJob.id);
+        if (match) setSelectedJob(match);
+        else if (jobList.length > 0) setSelectedJob(jobList[0]);
+        else setSelectedJob(null);
+      } else if (jobList.length > 0) {
         setSelectedJob(jobList[0]);
       }
     } catch (err) {
       console.error("Failed to fetch jobs", err);
     } finally {
       setLoading(false);
+      setTimeout(() => setIsRefreshing(false), 300);
     }
   };
 
@@ -84,6 +93,23 @@ function JobsDashboardContent() {
     }
   };
 
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      if (typeof window !== "undefined" && window.desktop?.automation?.deleteJob) {
+        await window.desktop.automation.deleteJob(jobId);
+      } else {
+        await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      }
+      const updatedList = jobs.filter((j) => j.id !== jobId);
+      setJobs(updatedList);
+      if (selectedJob?.id === jobId) {
+        setSelectedJob(updatedList.length > 0 ? updatedList[0] : null);
+      }
+    } catch (err) {
+      console.error("Failed to delete job", err);
+    }
+  };
+
 
   const completedCount = selectedJob
     ? selectedJob.successfulItems + selectedJob.failedItems + selectedJob.skippedItems
@@ -103,10 +129,11 @@ function JobsDashboardContent() {
         </div>
         <button
           onClick={fetchJobs}
-          className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/60 transition-all"
+          disabled={isRefreshing}
+          className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/60 transition-all cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-sky-400" : ""}`} />
+          <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
         </button>
       </div>
 
@@ -203,7 +230,7 @@ function JobsDashboardContent() {
                     {selectedJob.status === "running" && (
                       <button
                         onClick={() => handleStopJob(selectedJob.id)}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-red-600 text-white font-semibold text-xs shadow-lg shadow-red-600/20 hover:bg-red-500 transition-all"
+                        className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-red-600 text-white font-semibold text-xs shadow-lg shadow-red-600/20 hover:bg-red-500 transition-all cursor-pointer"
                       >
                         <Square className="w-3.5 h-3.5 fill-current" />
                         <span>Stop Automation</span>
@@ -213,10 +240,21 @@ function JobsDashboardContent() {
                     {selectedJob.status !== "running" && (selectedJob.failedItems > 0 || selectedJob.skippedItems > 0) && (
                       <button
                         onClick={() => handleRetryJob(selectedJob.id)}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-amber-600 text-white font-semibold text-xs shadow-lg shadow-amber-600/20 hover:bg-amber-500 transition-all"
+                        className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-amber-600 text-white font-semibold text-xs shadow-lg shadow-amber-600/20 hover:bg-amber-500 transition-all cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Retry Failed Items ({selectedJob.failedItems + selectedJob.skippedItems})</span>
+                      </button>
+                    )}
+
+                    {selectedJob.status !== "running" && (
+                      <button
+                        onClick={() => handleDeleteJob(selectedJob.id)}
+                        title="Delete this job from history"
+                        className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-950/40 border border-slate-700/60 hover:border-red-500/40 text-xs font-medium transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
                       </button>
                     )}
                   </div>

@@ -12,14 +12,14 @@ export const DiscoverCommentsSchema = z.object({
     .number()
     .int()
     .positive()
-    .max(100, "Maximum 100 comments per discovery run allowed")
-    .default(50),
+    .max(500, "Maximum 500 comments per discovery run allowed")
+    .default(300),
   maxScrolls: z
     .number()
     .int()
     .positive()
-    .max(30)
-    .default(15),
+    .max(200)
+    .default(120),
   excludedUsernames: z.array(z.string()).optional(),
 });
 
@@ -39,13 +39,14 @@ export const ReplyCommentsSchema = z.object({
         isSelected: z.boolean().default(true),
       })
     )
-    .min(1, "At least one selected comment is required"),
+    .min(1, "At least one selected comment is required")
+    .max(500, "Maximum 500 comments allowed per job"),
   reply: z
     .string()
     .min(1, "Reply message cannot be empty")
     .max(280, "Reply message cannot exceed 280 characters")
     .transform((v) => v.trim()),
-  confirmationMode: z.enum(["per-comment", "batch"]).default("per-comment"),
+  confirmationMode: z.enum(["per-comment", "batch"]).default("batch"),
   excludedUsernames: z.array(z.string()).optional(),
 });
 

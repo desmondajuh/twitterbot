@@ -18,6 +18,7 @@
   "include": [
     "electron/**/*",
     "src/automation/**/*",
+    "src/db/**/*",
     "src/queue/**/*",
     "src/types/**/*",
     "src/utils/**/*",

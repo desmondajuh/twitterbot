@@ -7,8 +7,8 @@ import { AppPaths } from "@/types/electron";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AutomationSettings>({
-    maxPostsPerJob: 20,
-    confirmationMode: "per-post",
+    maxPostsPerJob: 300,
+    confirmationMode: "batch",
     navigationTimeoutMs: 30000,
     actionTimeoutMs: 10000,
     maxRetries: 2,
@@ -117,14 +117,14 @@ export default function SettingsPage() {
           <input
             type="number"
             min={1}
-            max={50}
+            max={500}
             value={settings.maxPostsPerJob}
             onChange={(e) =>
-              setSettings({ ...settings, maxPostsPerJob: parseInt(e.target.value) || 20 })
+              setSettings({ ...settings, maxPostsPerJob: parseInt(e.target.value) || 300 })
             }
             className="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/50 font-mono"
           />
-          <p className="text-xs text-slate-400">Conservative limit per batch execution (default: 20).</p>
+          <p className="text-xs text-slate-400">Limit per batch execution (default: 300, maximum: 500).</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -225,7 +225,16 @@ export default function SettingsPage() {
           Access your persistent browser session, runtime error logs, and debug screenshots directly in file explorer.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => handleOpenFolder("userData")}
+            className="flex items-center justify-center space-x-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 hover:text-white transition-all cursor-pointer"
+          >
+            <FolderOpen className="w-4 h-4 text-amber-400" />
+            <span>SQLite Database</span>
+          </button>
+
           <button
             type="button"
             onClick={() => handleOpenFolder("logs")}
@@ -256,6 +265,7 @@ export default function SettingsPage() {
 
         {paths && (
           <div className="pt-3 border-t border-slate-800/80 text-[11px] font-mono text-slate-500 break-all space-y-1">
+            <div><span className="text-slate-400">Database:</span> {paths.userData}\database.sqlite</div>
             <div><span className="text-slate-400">UserData:</span> {paths.userData}</div>
             <div><span className="text-slate-400">Logs:</span> {paths.logs}</div>
           </div>

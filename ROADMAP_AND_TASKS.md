@@ -23,39 +23,30 @@ However, several **critical gaps**, **performance bottlenecks**, and **missing p
 
 These tasks address immediate defects or architectural omissions that impact usability and data safety.
 
-### 🔴 Task 1.1: Persistent Storage for Jobs & Execution History
-- **Issue**: `src/queue/queue.ts` uses an in-memory `Map<string, AutomationJob>`. Closing or refreshing the desktop application permanently wipes all job history, completed reply records, item states, and error diagnostics.
-- **Action**:
-  - Replace or back the in-memory `Map` with a persistent local store (e.g., `electron-store`, `lowdb`, or SQLite via `better-sqlite3`).
-  - Store jobs in `%APPDATA%/X Engagement Assistant/jobs.json`.
-  - Add auto-save on job status and item status changes.
-  - Load existing jobs on startup so users can view past jobs on `/jobs`.
-- **Target Files**:
-  - `src/queue/queue.ts`
-  - `electron/services/automation-service.ts`
-  - `src/types/index.ts`
-- **Impact**: High | **Effort**: Medium
+### 🟢 Task 1.1: Embedded SQLite Database for Jobs, Items & Settings [COMPLETED]
+- **Status**: Completed & Verified.
+- **Implemented**: Built an embedded, ACID-compliant **SQLite database** layer (`node:sqlite` in Node 22) located in `%APPDATA%/X Engagement Assistant/database.sqlite` (with local `./browser-data/database.sqlite` fallback).
+  - Configured high-performance Write-Ahead Logging (`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;`).
+  - Implemented typed `JobsRepository` and `SettingsRepository` with indexes on `created_at`, `status`, and `job_id`.
+  - Added automatic legacy migration: imports existing `jobs.json` and `settings.json` records on first boot without data loss.
+  - Added cascading deletes (`ON DELETE CASCADE`) to clean up orphan items automatically.
+  - Added quick-access "SQLite Database" folder opener to `/settings`.
 
 ---
 
-### 🔴 Task 1.2: Persistent Settings & Wiring Configuration to Engine
-- **Issue**:
-  - On `/settings`, clicking "Save Settings" only updates local React component state and displays a temporary message (`setSaved(true)`). It does **not** persist settings to disk or notify Electron.
-  - `electron/services/settings-service.ts` only implements `getPaths()`. It does not support reading or writing custom settings.
-  - Automation services (`JobProcessor`, `XClient`) hardcode fallback constants (e.g., `navigationTimeoutMs: 30000`, `maxRetries: 2`) instead of reading configured user values.
-- **Action**:
-  - Implement `settings:get` and `settings:update` IPC channels in `electron/ipc/settings.ipc.ts` and `electron/preload.ts`.
-  - Persist settings to `%APPDATA%/X Engagement Assistant/settings.json`.
-  - Pass loaded settings into `JobProcessor` and `XClient`.
-  - Wire the `/settings` page form to load initial values from `window.desktop.settings.get()` and save via `window.desktop.settings.update()`.
-- **Target Files**:
-  - `src/app/settings/page.tsx`
-  - `electron/services/settings-service.ts`
-  - `electron/ipc/settings.ipc.ts`
-  - `electron/preload.ts`
-  - `src/types/electron.d.ts`
-  - `src/queue/processor.ts`
-- **Impact**: High | **Effort**: Low to Medium
+### 🟢 Task 1.2: Persistent Settings & Wiring Configuration to Engine [COMPLETED]
+- **Status**: Completed & Verified.
+- **Implemented**: Implemented `settings:get` and `settings:update` IPC channels in `electron/ipc/settings.ipc.ts`, persisted config to `%APPDATA%/X Engagement Assistant/settings.json`, and wired `/settings` page directly with real-time feedback. Wired custom timeouts (`navigationTimeoutMs`, `actionTimeoutMs`, `maxRetries`, `keepBrowserOpenOnFinish`) directly into `JobProcessor` and `automation-service.ts`.
+
+---
+
+### 🟢 Task 1.3b: High-Volume Comment Reply Scaling & Batch Mode Default [COMPLETED]
+- **Status**: Completed & Verified.
+- **Resolution**:
+  - Removed old 20-post restriction in `CreateJobSchema`, `DiscoverCommentsSchema`, and `ReplyCommentsSchema`.
+  - Expanded job queue and discovery schema bounds to support up to 500 items per job (defaulting to 300 comments per run).
+  - Promoted **Batch Mode** to the primary system default across UI forms, settings defaults, and backend schemas, allowing hands-free sequential execution of high-volume engagement campaigns without per-item prompt exhaustion.
+  - Added dynamic scroll calculation (up to 200 scrolls; default: 120) and inline discovery limit input.
 
 ---
 

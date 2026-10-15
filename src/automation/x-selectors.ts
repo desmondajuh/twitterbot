@@ -41,14 +41,14 @@ export const xSelectors = {
 
   // Recipient / Conversation Controls
   recipients: {
-    // "Replying to @..." header/button above the composer box
-    replyingToTrigger: '[role="dialog"] button:has-text("Replying to"), [role="dialog"] [aria-label*="Replying to"], button:has-text("Replying to"), [data-testid="replyingToHeader"], [aria-label*="Replying to"]',
+    // "Replying to @..." clickable header/button above the composer box
+    replyingToTrigger: ':is([role="dialog"], body) :is(div, span):has-text("Replying to") :is([role="button"], button, a, span):has-text("@"), :is(div, span):has-text("Replying to") :is([role="button"], button, a, span):has-text("@"), :is([role="dialog"], body) :is(div, span):has-text("Replying to") :is([role="button"], button, a, span):has-text("other"), [role="button"]:has-text("@"), button:has-text("@"), a:has-text("@")',
     // Modal or sheet popover that lists conversation recipients
     modalContainer: '[role="dialog"][aria-label*="Replying to"], [role="dialog"]',
     // "Others in this conversation" control / checkbox
     othersInConversationControl: '[aria-label*="Others in this conversation"], :has-text("Others in this conversation"), [data-testid*="othersInConversation"]',
     othersCheckbox: 'input[type="checkbox"], [role="checkbox"]',
     // Done / Save button on recipient selector popover
-    doneButton: 'button:has-text("Done"), [data-testid="doneButton"], button:has-text("Save")',
+    doneButton: 'button:has-text("Done"), [data-testid="doneButton"], button:has-text("Save"), [role="button"]:has-text("Done")',
   },
 };

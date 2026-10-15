@@ -87,7 +87,12 @@ export class AutomationService {
   public async createReplyJob(input: CreateJobInput): Promise<{ jobId: string; job: AutomationJob }> {
     const settings = await settingsService.getSettings();
 
-    const commentUrls = input.urls.map((u) => {
+    const rawUrls =
+      input.comments && input.comments.length > 0 && input.urls.length !== input.comments.length
+        ? input.comments.map((c) => c.url)
+        : input.urls;
+
+    const commentUrls = rawUrls.map((u) => {
       let url = u.trim();
       if (!url.startsWith("http")) {
         url = `https://x.com${url.startsWith("/") ? "" : "/"}${url}`;
@@ -95,12 +100,12 @@ export class AutomationService {
       return url;
     });
 
-    const confirmationMode = input.confirmationMode || settings.confirmationMode || "per-post";
+    const confirmationMode = input.confirmationMode || settings.confirmationMode || "batch";
 
     const job = jobQueue.createJob({
       urls: commentUrls,
       reply: input.reply,
-      confirmationMode: confirmationMode === "batch" ? "batch" : "per-post",
+      confirmationMode: confirmationMode === "per-post" ? "per-post" : "batch",
       type: input.type || "comment_reply",
       comments: input.comments,
       excludedUsernames: input.excludedUsernames || [],
@@ -184,6 +189,10 @@ export class AutomationService {
 
   public async getAllJobs(): Promise<AutomationJob[]> {
     return jobQueue.getAllJobs();
+  }
+
+  public async deleteJob(jobId: string): Promise<boolean> {
+    return jobQueue.deleteJob(jobId);
   }
 
   public async retryJob(jobId: string): Promise<AutomationJob | undefined> {

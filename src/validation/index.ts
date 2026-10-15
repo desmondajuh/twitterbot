@@ -10,14 +10,14 @@ export const CreateJobSchema = z.object({
   urls: z
     .array(z.string())
     .min(1, "At least one X post URL is required")
-    .max(20, "Maximum 20 post URLs allowed per job")
+    .max(500, "Maximum 500 post URLs allowed per job")
     .refine(
       (urls) => {
         return urls.every((url) => validateAndParseXPostUrl(url).valid);
       },
       { message: "One or more URLs are invalid X post URLs" }
     ),
-  confirmationMode: z.enum(["per-post", "batch"]).default("per-post"),
+  confirmationMode: z.enum(["per-post", "batch"]).default("batch"),
   type: z.enum(["post_reply", "comment_reply"]).optional().default("post_reply"),
   excludedUsernames: z.array(z.string()).optional(),
 });
