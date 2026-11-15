@@ -219,8 +219,8 @@ export async function discoverComments(
   log(`Starting comment discovery for post: ${targetUrl} (parentPostId: ${parentPostId})`, "info");
 
   const client = new XClient();
-  await client.assertAuthenticated(page);
   await client.navigateToPost(page, targetUrl);
+  await client.assertAuthenticated(page);
 
   const commentsById = new Map<string, XComment>();
   let noNewCommentsCount = 0;

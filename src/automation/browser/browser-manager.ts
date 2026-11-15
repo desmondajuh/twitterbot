@@ -41,14 +41,10 @@ export class BrowserManager {
 
     const launchOptions: any = {
       headless,
-      viewport: { width: 1280, height: 800 },
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: null,
       ignoreDefaultArgs: ["--enable-automation"],
       args: [
         "--disable-blink-features=AutomationControlled",
-        "--no-sandbox",
-        "--disable-infobars",
       ],
     };
 
@@ -77,17 +73,6 @@ export class BrowserManager {
       log(`Launch with channel/custom executable failed, falling back to default Chromium: ${(err as Error).message}`, "warn");
       this.activeContext = await chromium.launchPersistentContext(userDataDir, launchOptions);
     }
-
-    // Anti-detection initialization script
-    await this.activeContext.addInitScript(() => {
-      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-      Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
-      Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
-      Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
-      if ((window as any).chrome) {
-        (window as any).chrome.runtime = (window as any).chrome.runtime || {};
-      }
-    });
 
     this.activeContext.on("close", () => {
       log("Browser context closed", "info");
@@ -141,6 +126,53 @@ export class BrowserManager {
         isAuthenticated: false,
       };
     }
+  }
+
+  /**
+   * Opens (or reuses) the browser window and navigates to X sign-in when not yet authenticated.
+   */
+  public async launchX(): Promise<{ running: boolean; profilePath: string; isAuthenticated: boolean }> {
+    const page = await this.getPage({ headless: false });
+    const currentUrl = page.url();
+    const isOnX = Boolean(currentUrl && currentUrl !== "about:blank" && currentUrl.includes("x.com"));
+
+    if (!isOnX || (!currentUrl.includes("/i/flow/login") && !(await checkIsAuthenticated(page)))) {
+      await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded" }).catch(() => {});
+    }
+
+    await page.bringToFront().catch(() => {});
+    return this.getStatus();
+  }
+
+  /**
+   * Clears X/Twitter cookies and site storage so a flagged/stale guest or login session can start fresh.
+   */
+  public async resetXSession(): Promise<{ running: boolean; profilePath: string; isAuthenticated: boolean }> {
+    const context = await this.getContext({ headless: false });
+    const page = await this.getPage({ headless: false });
+
+    log("Clearing X/Twitter cookies and site storage for a fresh login session...", "info");
+
+    await context.clearCookies({ domain: /(^|\.)(x|twitter)\.com$/i }).catch(() => {});
+
+    try {
+      const cdp = await context.newCDPSession(page);
+      for (const origin of ["https://x.com", "https://twitter.com"]) {
+        await cdp
+          .send("Storage.clearDataForOrigin", {
+            origin,
+            storageTypes: "all",
+          })
+          .catch(() => {});
+      }
+      await cdp.detach().catch(() => {});
+    } catch {
+      // Ignore if CDP session is unavailable
+    }
+
+    await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded" }).catch(() => {});
+    await page.bringToFront().catch(() => {});
+    return this.getStatus();
   }
 
   /**

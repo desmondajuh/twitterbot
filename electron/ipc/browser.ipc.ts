@@ -10,6 +10,10 @@ export function registerBrowserIpc(): void {
     return browserService.launchX();
   });
 
+  ipcMain.handle("browser:reset-x-session", async () => {
+    return browserService.resetXSession();
+  });
+
   ipcMain.handle("browser:disconnect", async () => {
     return browserService.disconnect();
   });

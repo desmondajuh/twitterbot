@@ -3,13 +3,7 @@ import { browserManager } from "@/automation/browser/browser-manager";
 
 export async function POST() {
   try {
-    const page = await browserManager.getPage({ headless: false });
-    const currentUrl = page.url();
-    if (!currentUrl || currentUrl === "about:blank" || !currentUrl.includes("x.com")) {
-      await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded" }).catch(() => {});
-    }
-    await page.bringToFront().catch(() => {});
-    const status = await browserManager.getStatus();
+    const status = await browserManager.launchX();
     return NextResponse.json({ success: true, status });
   } catch (error) {
     return NextResponse.json(

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("desktop", {
   browser: {
     connect: () => ipcRenderer.invoke("browser:connect"),
     launchX: () => ipcRenderer.invoke("browser:launch-x"),
+    resetXSession: () => ipcRenderer.invoke("browser:reset-x-session"),
     disconnect: () => ipcRenderer.invoke("browser:disconnect"),
     getStatus: () => ipcRenderer.invoke("browser:status"),
   },

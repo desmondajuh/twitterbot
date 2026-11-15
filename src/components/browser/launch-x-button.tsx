@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, RefreshCw, CheckCircle2 } from "lucide-react";
+import { ExternalLink, RefreshCw, CheckCircle2, RotateCcw } from "lucide-react";
 
 function TwitterIcon({ className }: { className?: string }) {
   return (
@@ -18,12 +18,15 @@ interface LaunchXButtonProps {
 
 export function LaunchXButton({ variant = "header", className = "" }: LaunchXButtonProps) {
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [lastLaunched, setLastLaunched] = useState(false);
+  const [sessionReset, setSessionReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLaunchX = async () => {
     setIsLaunching(true);
     setError(null);
+    setSessionReset(false);
     try {
       if (typeof window !== "undefined" && window.desktop?.browser?.launchX) {
         await window.desktop.browser.launchX();
@@ -45,6 +48,29 @@ export function LaunchXButton({ variant = "header", className = "" }: LaunchXBut
     }
   };
 
+  const handleResetSession = async () => {
+    setIsResetting(true);
+    setError(null);
+    setLastLaunched(false);
+    try {
+      if (typeof window !== "undefined" && window.desktop?.browser?.resetXSession) {
+        await window.desktop.browser.resetXSession();
+      } else {
+        const res = await fetch("/api/browser/reset", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Failed to reset X session");
+        }
+      }
+      setSessionReset(true);
+      setTimeout(() => setSessionReset(false), 4000);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   if (variant === "card") {
     return (
       <div className={`glass-card rounded-2xl p-5 border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900 to-indigo-950/40 ${className}`}>
@@ -61,6 +87,11 @@ export function LaunchXButton({ variant = "header", className = "" }: LaunchXBut
                     <CheckCircle2 className="w-3 h-3" /> Browser Opened
                   </span>
                 )}
+                {sessionReset && (
+                  <span className="text-[10px] bg-sky-950 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 font-normal">
+                    <CheckCircle2 className="w-3 h-3" /> Session Reset
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Launch persistent Playwright browser to sign in or verify active X session.
@@ -68,25 +99,38 @@ export function LaunchXButton({ variant = "header", className = "" }: LaunchXBut
             </div>
           </div>
 
-          <button
-            type="button"
-            disabled={isLaunching}
-            onClick={handleLaunchX}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-sky-500/25 disabled:opacity-50 transition-all shrink-0 cursor-pointer"
-          >
-            {isLaunching ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Launching Browser...</span>
-              </>
-            ) : (
-              <>
-                <TwitterIcon className="w-4 h-4" />
-                <span>Launch & Sign in X</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              disabled={isLaunching || isResetting}
+              onClick={handleResetSession}
+              title="Clear X cookies & site data and open a fresh login page"
+              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 text-slate-200 font-medium text-xs disabled:opacity-50 transition-all cursor-pointer"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? "animate-spin" : ""}`} />
+              <span>{isResetting ? "Resetting..." : "Reset Session"}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isLaunching || isResetting}
+              onClick={handleLaunchX}
+              className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-sky-500/25 disabled:opacity-50 transition-all shrink-0 cursor-pointer"
+            >
+              {isLaunching ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Launching Browser...</span>
+                </>
+              ) : (
+                <>
+                  <TwitterIcon className="w-4 h-4" />
+                  <span>Launch & Sign in X</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
         {error && <p className="text-xs text-red-400 mt-2 font-medium">{error}</p>}
       </div>

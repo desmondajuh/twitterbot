@@ -61,6 +61,7 @@ export interface DesktopAPI {
   browser: {
     connect: () => Promise<BrowserStatus>;
     launchX: () => Promise<BrowserStatus>;
+    resetXSession: () => Promise<BrowserStatus>;
     disconnect: () => Promise<void>;
     getStatus: () => Promise<BrowserStatus>;
   };

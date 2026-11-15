@@ -8,13 +8,11 @@ export class BrowserService {
   }
 
   public async launchX(): Promise<BrowserStatus> {
-    const page = await browserManager.getPage({ headless: false });
-    const currentUrl = page.url();
-    if (!currentUrl || currentUrl === "about:blank" || !currentUrl.includes("x.com")) {
-      await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded" }).catch(() => {});
-    }
-    await page.bringToFront().catch(() => {});
-    return browserManager.getStatus();
+    return browserManager.launchX();
+  }
+
+  public async resetXSession(): Promise<BrowserStatus> {
+    return browserManager.resetXSession();
   }
 
   public async disconnect(): Promise<void> {
